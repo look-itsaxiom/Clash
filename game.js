@@ -214,8 +214,8 @@ function resolveRound() {
     
     let resultHTML = '<h3>Round Result:</h3>';
     
-    // Move cards to discard first (so Recharge doesn't return itself)
-    // But keep playedCard references so Defense can check opponent's card
+    // Move cards to discard first (before processing effects)
+    // Keep playedCard references so Defense can check opponent's card
     GameState.player.discard.push(playerCard);
     GameState.ai.discard.push(aiCard);
     
