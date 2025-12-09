@@ -281,6 +281,7 @@ function processCardEffect(card, player, opponent) {
             
         case CardType.RECHARGE:
             // Return all cards from discard except the Recharge card itself (which was just added)
+            // Note: Each deck has only 1 Recharge card, so reference equality is sufficient
             const discardedCards = player.discard.filter(c => c !== card);
             const returned = discardedCards.length;
             player.hand.push(...discardedCards);
