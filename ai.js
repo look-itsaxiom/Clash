@@ -1,7 +1,6 @@
 // AI card selection logic
 function aiSelectCard() {
     const aiHand = GameState.ai.hand;
-    const playerCard = GameState.player.playedCard;
     
     if (aiHand.length === 0) {
         return null;
