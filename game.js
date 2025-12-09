@@ -214,6 +214,12 @@ function resolveRound() {
     
     let resultHTML = '<h3>Round Result:</h3>';
     
+    // Move cards to discard first (so Recharge doesn't return itself)
+    GameState.player.discard.push(playerCard);
+    GameState.ai.discard.push(aiCard);
+    GameState.player.playedCard = null;
+    GameState.ai.playedCard = null;
+    
     // Process player's card effect
     let playerEffect = processCardEffect(playerCard, GameState.player, GameState.ai);
     if (playerEffect) {
@@ -225,12 +231,6 @@ function resolveRound() {
     if (aiEffect) {
         resultHTML += `<p>AI: ${aiEffect}</p>`;
     }
-    
-    // Move cards to discard
-    GameState.player.discard.push(playerCard);
-    GameState.ai.discard.push(aiCard);
-    GameState.player.playedCard = null;
-    GameState.ai.playedCard = null;
     
     // Display results
     document.getElementById('result-display').innerHTML = resultHTML;
@@ -280,9 +280,12 @@ function processCardEffect(card, player, opponent) {
             break;
             
         case CardType.RECHARGE:
-            const returned = player.discard.length;
-            player.hand.push(...player.discard);
-            player.discard = [];
+            // Return all cards from discard except the Recharge card itself (which was just added)
+            const discardedCards = player.discard.filter(c => c !== card);
+            const returned = discardedCards.length;
+            player.hand.push(...discardedCards);
+            // Keep only the Recharge card in discard
+            player.discard = [card];
             message = `${card.name} returned ${returned} card(s) to hand!`;
             break;
     }
