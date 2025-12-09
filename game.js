@@ -215,10 +215,9 @@ function resolveRound() {
     let resultHTML = '<h3>Round Result:</h3>';
     
     // Move cards to discard first (so Recharge doesn't return itself)
+    // But keep playedCard references so Defense can check opponent's card
     GameState.player.discard.push(playerCard);
     GameState.ai.discard.push(aiCard);
-    GameState.player.playedCard = null;
-    GameState.ai.playedCard = null;
     
     // Process player's card effect
     let playerEffect = processCardEffect(playerCard, GameState.player, GameState.ai);
@@ -231,6 +230,10 @@ function resolveRound() {
     if (aiEffect) {
         resultHTML += `<p>AI: ${aiEffect}</p>`;
     }
+    
+    // Clear playedCard references after processing effects
+    GameState.player.playedCard = null;
+    GameState.ai.playedCard = null;
     
     // Display results
     document.getElementById('result-display').innerHTML = resultHTML;
