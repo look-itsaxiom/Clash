@@ -61,6 +61,8 @@ function initGame() {
 
 // Create a deck of cards
 function createDeck() {
+    // Deck composition: 1 Attack, 2 Defense, 1 Heal (one-time), 1 Recharge, 1 Heavy Attack (one-time)
+    // Reduced to 1 regular Attack to balance the addition of Heavy Attack
     return [
         { type: CardType.ATTACK, icon: '⚔️', name: 'Attack' },
         { type: CardType.DEFENSE, icon: '🛡️', name: 'Defense' },
@@ -110,6 +112,17 @@ function renderPlayerHand() {
     });
 }
 
+// Helper function to add no-recharge indicator to a card
+function addNoRechargeIndicator(cardDiv, card) {
+    if (card.noRecharge) {
+        const indicatorDiv = document.createElement('div');
+        indicatorDiv.className = 'no-recharge-indicator';
+        indicatorDiv.textContent = '⚠️';
+        indicatorDiv.title = 'Does not return via Recharge';
+        cardDiv.appendChild(indicatorDiv);
+    }
+}
+
 // Create card element
 function createCardElement(card, index) {
     const cardDiv = document.createElement('div');
@@ -132,13 +145,7 @@ function createCardElement(card, index) {
     cardDiv.appendChild(typeDiv);
     
     // Add no-recharge indicator
-    if (card.noRecharge) {
-        const indicatorDiv = document.createElement('div');
-        indicatorDiv.className = 'no-recharge-indicator';
-        indicatorDiv.textContent = '⚠️';
-        indicatorDiv.title = 'Does not return via Recharge';
-        cardDiv.appendChild(indicatorDiv);
-    }
+    addNoRechargeIndicator(cardDiv, card);
     
     if (GameState.phase === 'select') {
         cardDiv.addEventListener('click', () => selectCard(index));
@@ -214,13 +221,7 @@ function displayPlayedCard(player, card) {
     cardDiv.appendChild(typeDiv);
     
     // Add no-recharge indicator
-    if (card.noRecharge) {
-        const indicatorDiv = document.createElement('div');
-        indicatorDiv.className = 'no-recharge-indicator';
-        indicatorDiv.textContent = '⚠️';
-        indicatorDiv.title = 'Does not return via Recharge';
-        cardDiv.appendChild(indicatorDiv);
-    }
+    addNoRechargeIndicator(cardDiv, card);
     
     slot.appendChild(cardDiv);
 }
