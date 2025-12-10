@@ -1,0 +1,404 @@
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.game-container {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    max-width: 1200px;
+    width: 100%;
+    padding: 30px;
+    position: relative;
+}
+
+/* Header */
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 3px solid #667eea;
+}
+
+header h1 {
+    font-size: 3em;
+    color: #667eea;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.subtitle {
+    font-size: 1.2em;
+    color: #666;
+}
+
+/* Main Layout */
+main {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+/* Player Sections */
+.player-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-radius: 15px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+}
+
+.ai-section {
+    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+}
+
+.player-section-main {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    flex-direction: column;
+    gap: 20px;
+}
+
+.player-info {
+    text-align: center;
+}
+
+.player-info h2 {
+    font-size: 1.8em;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+/* Hearts Display */
+.hearts {
+    font-size: 2em;
+    margin: 10px 0;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.heart {
+    transition: all 0.3s ease;
+}
+
+.heart.lost {
+    opacity: 0.2;
+    filter: grayscale(100%);
+}
+
+.hand-count {
+    font-size: 1em;
+    color: #666;
+    margin-top: 10px;
+}
+
+/* Card Slot */
+.played-card-area {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.card-slot {
+    width: 150px;
+    height: 200px;
+    border: 3px dashed #999;
+    border-radius: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.card-placeholder {
+    color: #999;
+    font-size: 1em;
+    text-align: center;
+}
+
+.card-back {
+    font-size: 4em;
+    color: #667eea;
+}
+
+/* Cards */
+.card {
+    width: 120px;
+    height: 160px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    position: relative;
+    font-weight: bold;
+    user-select: none;
+}
+
+.card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+.card.selected {
+    transform: translateY(-15px);
+    box-shadow: 0 12px 24px rgba(102, 126, 234, 0.5);
+    border: 3px solid #667eea;
+}
+
+.card.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.card.disabled:hover {
+    transform: none;
+}
+
+.card-icon {
+    font-size: 3em;
+    margin-bottom: 10px;
+}
+
+.card-type {
+    font-size: 1.2em;
+    text-transform: uppercase;
+}
+
+/* Card Types */
+.card.attack {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+}
+
+.card.defense {
+    background: linear-gradient(135deg, #4ecdc4 0%, #44a3a0 100%);
+    color: white;
+}
+
+.card.heal {
+    background: linear-gradient(135deg, #95e1d3 0%, #38ada9 100%);
+    color: white;
+}
+
+.card.recharge {
+    background: linear-gradient(135deg, #f7dc6f 0%, #f4d03f 100%);
+    color: #333;
+}
+
+/* Card when played */
+.played-card {
+    width: 150px;
+    height: 200px;
+    animation: slideIn 0.5s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Player Hand */
+.player-hand {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+    padding: 20px;
+    min-height: 180px;
+}
+
+/* Battle Area */
+.battle-area {
+    text-align: center;
+    padding: 30px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 15px;
+}
+
+.turn-info {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #667eea;
+    margin-bottom: 15px;
+}
+
+.result-display {
+    font-size: 1.2em;
+    margin: 20px 0;
+    min-height: 60px;
+    padding: 15px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.result-display p {
+    margin: 5px 0;
+}
+
+/* Buttons */
+.btn {
+    padding: 15px 30px;
+    font-size: 1.1em;
+    font-weight: bold;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin: 5px;
+}
+
+.btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    max-width: 500px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content h2 {
+    font-size: 2.5em;
+    margin-bottom: 20px;
+    color: #667eea;
+}
+
+.modal-content p {
+    font-size: 1.3em;
+    margin-bottom: 30px;
+    color: #666;
+}
+
+/* Rules Panel */
+.rules-panel {
+    margin-top: 30px;
+    padding: 20px;
+    background: rgba(102, 126, 234, 0.1);
+    border-radius: 15px;
+    border-left: 5px solid #667eea;
+}
+
+.rules-panel h3 {
+    color: #667eea;
+    margin-bottom: 15px;
+    font-size: 1.5em;
+}
+
+.rules-panel ul {
+    list-style: none;
+    padding: 0;
+}
+
+.rules-panel li {
+    padding: 8px 0;
+    font-size: 1.1em;
+    color: #333;
+}
+
+.rules-note {
+    margin-top: 15px;
+    font-style: italic;
+    color: #666;
+    line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .game-container {
+        padding: 15px;
+    }
+
+    header h1 {
+        font-size: 2em;
+    }
+
+    .player-section {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .card {
+        width: 100px;
+        height: 140px;
+    }
+
+    .card-icon {
+        font-size: 2.5em;
+    }
+
+    .card-type {
+        font-size: 1em;
+    }
+
+    .player-hand {
+        gap: 10px;
+    }
+
+    .played-card {
+        width: 120px;
+        height: 160px;
+    }
+
+    .card-slot {
+        width: 120px;
+        height: 160px;
+    }
+}
