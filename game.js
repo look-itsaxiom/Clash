@@ -61,9 +61,9 @@ function initGame() {
 
 // Create a deck of cards
 function createDeck() {
-    // Deck composition: 1 Attack, 2 Defense, 1 Heal (one-time), 1 Recharge, 1 Heavy Attack (one-time)
-    // Reduced to 1 regular Attack to balance the addition of Heavy Attack
+    // Deck composition: 2 Attack, 2 Defense, 1 Heal (one-time), 1 Recharge, 1 Heavy Attack (one-time)
     return [
+        { type: CardType.ATTACK, icon: '⚔️', name: 'Attack' },
         { type: CardType.ATTACK, icon: '⚔️', name: 'Attack' },
         { type: CardType.DEFENSE, icon: '🛡️', name: 'Defense' },
         { type: CardType.DEFENSE, icon: '🛡️', name: 'Defense' },
