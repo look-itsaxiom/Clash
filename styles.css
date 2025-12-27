@@ -189,6 +189,12 @@ main {
     color: white;
 }
 
+.card.heavy-attack {
+    background: linear-gradient(135deg, #d63031 0%, #b71540 100%);
+    color: white;
+    border: 2px solid #ffeaa7;
+}
+
 .card.defense {
     background: linear-gradient(135deg, #4ecdc4 0%, #44a3a0 100%);
     color: white;
@@ -202,6 +208,22 @@ main {
 .card.recharge {
     background: linear-gradient(135deg, #f7dc6f 0%, #f4d03f 100%);
     color: #333;
+}
+
+/* No Recharge Indicator */
+.no-recharge-indicator {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1.2em;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: help;
 }
 
 /* Card when played */

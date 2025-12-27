@@ -34,6 +34,9 @@ function aiSelectCard() {
             case CardType.ATTACK:
                 // More aggressive when ahead
                 return GameState.ai.hearts > GameState.player.hearts ? 40 : 30;
+            case CardType.HEAVY_ATTACK:
+                // Use strategically - higher priority when opponent is low on health
+                return GameState.player.hearts <= 1 ? 50 : 35;
             case CardType.DEFENSE:
                 // More defensive when behind
                 return GameState.ai.hearts < GameState.player.hearts ? 35 : 25;
@@ -79,22 +82,26 @@ function getCardPriority(cardType, situation) {
             [CardType.HEAL]: 10,
             [CardType.DEFENSE]: 8,
             [CardType.RECHARGE]: 5,
-            [CardType.ATTACK]: 3
+            [CardType.ATTACK]: 3,
+            [CardType.HEAVY_ATTACK]: 4
         },
         'defensive': {
             [CardType.DEFENSE]: 9,
             [CardType.HEAL]: 7,
             [CardType.ATTACK]: 5,
-            [CardType.RECHARGE]: 4
+            [CardType.RECHARGE]: 4,
+            [CardType.HEAVY_ATTACK]: 6
         },
         'neutral': {
             [CardType.ATTACK]: 7,
             [CardType.DEFENSE]: 6,
             [CardType.HEAL]: 5,
-            [CardType.RECHARGE]: 5
+            [CardType.RECHARGE]: 5,
+            [CardType.HEAVY_ATTACK]: 8
         },
         'aggressive': {
             [CardType.ATTACK]: 10,
+            [CardType.HEAVY_ATTACK]: 12,
             [CardType.DEFENSE]: 4,
             [CardType.HEAL]: 3,
             [CardType.RECHARGE]: 3

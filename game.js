@@ -21,7 +21,8 @@ const CardType = {
     ATTACK: 'attack',
     DEFENSE: 'defense',
     HEAL: 'heal',
-    RECHARGE: 'recharge'
+    RECHARGE: 'recharge',
+    HEAVY_ATTACK: 'heavy-attack'
 };
 
 // Initialize game
@@ -60,13 +61,15 @@ function initGame() {
 
 // Create a deck of cards
 function createDeck() {
+    // Deck composition: 2 Attack, 2 Defense, 1 Heal (one-time), 1 Recharge, 1 Heavy Attack (one-time)
     return [
         { type: CardType.ATTACK, icon: '⚔️', name: 'Attack' },
         { type: CardType.ATTACK, icon: '⚔️', name: 'Attack' },
         { type: CardType.DEFENSE, icon: '🛡️', name: 'Defense' },
         { type: CardType.DEFENSE, icon: '🛡️', name: 'Defense' },
-        { type: CardType.HEAL, icon: '💚', name: 'Heal' },
-        { type: CardType.RECHARGE, icon: '🔄', name: 'Recharge' }
+        { type: CardType.HEAL, icon: '💚', name: 'Heal', noRecharge: true },
+        { type: CardType.RECHARGE, icon: '🔄', name: 'Recharge' },
+        { type: CardType.HEAVY_ATTACK, icon: '💥', name: 'Heavy Attack', noRecharge: true }
     ];
 }
 
@@ -109,6 +112,17 @@ function renderPlayerHand() {
     });
 }
 
+// Helper function to add no-recharge indicator to a card
+function addNoRechargeIndicator(cardDiv, card) {
+    if (card.noRecharge) {
+        const indicatorDiv = document.createElement('div');
+        indicatorDiv.className = 'no-recharge-indicator';
+        indicatorDiv.textContent = '⚠️';
+        indicatorDiv.title = 'Does not return via Recharge';
+        cardDiv.appendChild(indicatorDiv);
+    }
+}
+
 // Create card element
 function createCardElement(card, index) {
     const cardDiv = document.createElement('div');
@@ -129,6 +143,9 @@ function createCardElement(card, index) {
     
     cardDiv.appendChild(iconDiv);
     cardDiv.appendChild(typeDiv);
+    
+    // Add no-recharge indicator
+    addNoRechargeIndicator(cardDiv, card);
     
     if (GameState.phase === 'select') {
         cardDiv.addEventListener('click', () => selectCard(index));
@@ -202,6 +219,10 @@ function displayPlayedCard(player, card) {
     
     cardDiv.appendChild(iconDiv);
     cardDiv.appendChild(typeDiv);
+    
+    // Add no-recharge indicator
+    addNoRechargeIndicator(cardDiv, card);
+    
     slot.appendChild(cardDiv);
 }
 
@@ -263,10 +284,20 @@ function processCardEffect(card, player, opponent) {
                 message = `${card.name} dealt 1 damage!`;
             }
             break;
+        
+        case CardType.HEAVY_ATTACK:
+            // Check if opponent has defense
+            if (opponent.playedCard && opponent.playedCard.type === CardType.DEFENSE) {
+                message = `${card.name} blocked by Defense!`;
+            } else {
+                opponent.hearts = Math.max(0, opponent.hearts - 2);
+                message = `${card.name} dealt 2 damage!`;
+            }
+            break;
             
         case CardType.DEFENSE:
             // Defense only works against attacks
-            if (opponent.playedCard && opponent.playedCard.type === CardType.ATTACK) {
+            if (opponent.playedCard && (opponent.playedCard.type === CardType.ATTACK || opponent.playedCard.type === CardType.HEAVY_ATTACK)) {
                 message = `${card.name} blocked the attack!`;
             } else {
                 message = `${card.name} (no attack to block)`;
@@ -283,10 +314,11 @@ function processCardEffect(card, player, opponent) {
             break;
             
         case CardType.RECHARGE:
-            // Return all cards from discard, including the Recharge card itself
-            const returned = player.discard.length;
-            player.hand.push(...player.discard);
-            player.discard = [];
+            // Return all cards from discard except those with noRecharge property
+            const cardsToReturn = player.discard.filter(c => !c.noRecharge);
+            const returned = cardsToReturn.length;
+            player.hand.push(...cardsToReturn);
+            player.discard = player.discard.filter(c => c.noRecharge);
             message = `${card.name} returned ${returned} card(s) to hand!`;
             break;
     }
