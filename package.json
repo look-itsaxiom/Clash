@@ -1,0 +1,26 @@
+{
+  "name": "clash",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build:shared": "cd packages/shared && npm run build",
+    "build:server": "cd apps/server && npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/look-itsaxiom/Clash.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/look-itsaxiom/Clash/issues"
+  },
+  "homepage": "https://github.com/look-itsaxiom/Clash#readme",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
