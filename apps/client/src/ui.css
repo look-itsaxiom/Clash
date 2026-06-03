@@ -27,10 +27,12 @@
 }
 
 /* ---- board ---- */
+/* As large as possible while preserving the 1000x720 aspect ratio: limited by
+   width on tall screens and by height on wide ones. */
 .board-wrap {
   position: relative;
-  width: min(96vw, 960px);
-  aspect-ratio: 960 / 640;
+  width: min(100vw, calc(100vh * (1000 / 720)));
+  height: min(100vh, calc(100vw * (720 / 1000)));
 }
 .game-container {
   width: 100%;
@@ -254,6 +256,15 @@
   flex-direction: column;
   align-items: center;
 }
+/* Nothing in the HUD should ever steal a click meant for the canvas hand —
+   only the end-of-game modal and its buttons are interactive. */
+.hud * {
+  pointer-events: none;
+}
+.modal-backdrop,
+.modal button {
+  pointer-events: auto;
+}
 .hud-top {
   margin-top: 10px;
   display: flex;
@@ -288,11 +299,12 @@
   margin-top: 8px;
   pointer-events: none;
 }
+/* Anchored to the top-left, clear of the hand and play slots. */
 .turn-log {
   position: absolute;
   left: 14px;
-  bottom: 14px;
-  max-width: 260px;
+  top: 70px;
+  max-width: 220px;
   display: flex;
   flex-direction: column;
   gap: 2px;

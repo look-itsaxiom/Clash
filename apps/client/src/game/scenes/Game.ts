@@ -5,9 +5,9 @@ import { ClashEvent, type RevealPayload } from "../events";
 import { BOARD_HEIGHT, BOARD_WIDTH } from "../constants";
 
 const CX = BOARD_WIDTH / 2;
-const CARD_W = 92;
-const CARD_H = 126;
-const HAND_GAP = 14;
+const CARD_W = 88;
+const CARD_H = 122;
+const HAND_GAP = 12;
 
 const PALETTE: Record<CardId, number> = {
   ATTACK: 0xe0524a,
@@ -22,15 +22,15 @@ const COLOR_BORDER = 0x3a4a82;
 const COLOR_EMPTY = 0x33406b;
 
 const LAYOUT = {
-  oppName: 26,
-  oppHearts: 56,
-  oppHand: 132,
-  oppSlot: 250,
-  vs: 322,
-  youSlot: 394,
-  youHearts: 524,
-  youName: 556,
-  youHand: 590,
+  oppName: 30,
+  oppHearts: 66,
+  oppHand: 134,
+  oppSlot: 254,
+  vs: 362,
+  youSlot: 468,
+  youHearts: 558,
+  youName: 585,
+  youHand: 658,
 };
 
 /**
@@ -81,7 +81,6 @@ export class Game extends Scene {
   private onView(view: ClientGameState) {
     if (!this.alive) return;
     this.view = view;
-    if (view.phase === "SELECTING" && !view.you.selected) this.submitting = false;
     this.renderView(view);
   }
 
@@ -95,6 +94,9 @@ export class Game extends Scene {
 
   private renderView(view: ClientGameState) {
     this.board.removeAll(true);
+    // A fresh selection turn clears the local submit lock, whether we arrived
+    // here from a plain state update or from the reveal animation settling.
+    if (view.phase === "SELECTING" && !view.you.selected) this.submitting = false;
     const youSelectable = view.phase === "SELECTING" && !view.you.selected && !this.submitting;
 
     this.label(view.opponent.name + (view.opponent.connected ? "" : "  (away)"), CX, LAYOUT.oppName, 20, "#c7d2fe");
