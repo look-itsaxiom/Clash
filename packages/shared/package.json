@@ -12,7 +12,12 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && node scripts/postbuild.mjs",
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && tsc -p tsconfig.cjs.json && tsc -p tsconfig.esm.json && node scripts/postbuild.mjs",
+    "prepare": "npm run build",
     "test": "npm run build && node --test"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
   }
 }

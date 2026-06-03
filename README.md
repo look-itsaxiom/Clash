@@ -48,7 +48,7 @@ This is an npm-workspaces monorepo:
 Requires Node 20+.
 
 ```bash
-npm install        # install all workspaces
+npm install        # installs all workspaces and builds @clash/shared automatically
 
 # Terminal 1 — the server (http://localhost:3000)
 npm run dev:server
@@ -56,6 +56,10 @@ npm run dev:server
 # Terminal 2 — the client (http://localhost:8080)
 npm run dev:client
 ```
+
+`@clash/shared` compiles to `dist/`, so it is built on install (and again before each
+`dev:*` task). If you edit the shared engine while the apps are running, rebuild it with
+`npm run build:shared`.
 
 Open two browser tabs, pick **Create Private Room** in one and **Join** with the code in the other (or hit **Find a Match** in both). Point the client at a non-default server with `VITE_SERVER_URL`.
 
