@@ -1,39 +1,79 @@
-import { WebSocketGateway, SubscribeMessage, MessageBody, ConnectedSocket, WebSocketServer } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { ClashGameState, CardType } from '@clash/shared';
+import {
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnGatewayInit,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+} from "@nestjs/websockets";
+import type { Move } from "@clash/shared";
+import { GameService } from "./game/game.service";
+import type { GameServer, GameSocket } from "./game/game.service";
 
+/**
+ * Thin Socket.IO adapter. Every handler simply forwards the event to
+ * {@link GameService}, which owns all rooms, timers, and game state. Keeping the
+ * transport and the logic separated makes the service unit-testable without a
+ * live socket and keeps this file a readable map of the wire protocol.
+ */
 @WebSocketGateway({
-  cors: { origin: '*' }, // later restrict to itch.io origin
+  cors: { origin: "*" }, // tighten to the deployed client origin before launch
 })
-export class GameGateway {
+export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
-  server: Server;
+  server!: GameServer;
 
-  // in-memory maps (fine for v1)
-  private matchmakingQueue: string[] = [];
-  private games = new Map<string, ClashGameState>();
-  private socketToPlayer = new Map<string, { playerId: string; gameId?: string }>();
+  constructor(private readonly games: GameService) {}
 
-  handleConnection(socket: Socket) {
-    // later attach auth info
-    console.log(`Client connected: ${socket.id}`);
+  afterInit(server: GameServer): void {
+    this.games.bind(server);
   }
 
-  @SubscribeMessage('queue_random')
-  handleQueue(@ConnectedSocket() socket: Socket) {
-    // add to queue, if 2 players, create game, emit game start to both
-    console.log(`Player queued for random match: ${socket.id}`);
+  handleConnection(socket: GameSocket): void {
+    this.games.handleConnect(socket);
   }
 
-  @SubscribeMessage('join_private')
-  handleJoinPrivate(@ConnectedSocket() socket: Socket, @MessageBody() data: { roomCode: string; create?: boolean }) {
-    // implement password style room matching
-    console.log(`Player joining private match: ${socket.id} - ${data.roomCode}`);
+  handleDisconnect(socket: GameSocket): void {
+    this.games.handleDisconnect(socket);
   }
 
-  @SubscribeMessage('submit_card')
-  handleSubmitCard(@ConnectedSocket() socket: Socket, @MessageBody() data: { card: CardType }) {
-    // lookup game by socket, call game logic, emit updated game state to both players
-    console.log(`Player submitted card: ${socket.id} - ${data.card}`);
+  @SubscribeMessage("lobby:queue")
+  onQueue(@ConnectedSocket() socket: GameSocket, @MessageBody() data: { name?: string }): void {
+    this.games.queueRandom(socket, data?.name);
+  }
+
+  @SubscribeMessage("lobby:cancel")
+  onCancel(@ConnectedSocket() socket: GameSocket): void {
+    this.games.cancelQueue(socket);
+  }
+
+  @SubscribeMessage("lobby:create_room")
+  onCreateRoom(@ConnectedSocket() socket: GameSocket, @MessageBody() data: { name?: string }): void {
+    this.games.createRoom(socket, data?.name);
+  }
+
+  @SubscribeMessage("lobby:join_room")
+  onJoinRoom(
+    @ConnectedSocket() socket: GameSocket,
+    @MessageBody() data: { roomCode: string; name?: string },
+  ): void {
+    this.games.joinRoom(socket, data.roomCode, data?.name);
+  }
+
+  @SubscribeMessage("game:submit")
+  onSubmit(@ConnectedSocket() socket: GameSocket, @MessageBody() data: { card: Move }): void {
+    this.games.submitMove(socket, data.card);
+  }
+
+  @SubscribeMessage("game:rematch")
+  onRematch(@ConnectedSocket() socket: GameSocket): void {
+    this.games.rematchVote(socket);
+  }
+
+  @SubscribeMessage("game:resume")
+  onResume(@ConnectedSocket() socket: GameSocket, @MessageBody() data: { token: string }): void {
+    this.games.resume(socket, data.token);
   }
 }

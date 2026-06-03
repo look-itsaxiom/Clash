@@ -1,16 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 
-import {
-  CARDS,
-  createGame,
-  createPlayer,
-  legalMoves,
-  submit,
-  resolve,
-  rematch,
-  viewFor,
-} from "../dist/index.js";
+// The package compiles to CommonJS; require it directly so every export resolves
+// regardless of the ESM/CJS interop heuristics.
+const require = createRequire(import.meta.url);
+const { CARDS, createGame, createPlayer, legalMoves, submit, resolve, rematch, viewFor } =
+  require("../dist/index.js");
 
 function game() {
   return createGame("g1", createPlayer("p0", "Alice"), createPlayer("p1", "Bob"));
