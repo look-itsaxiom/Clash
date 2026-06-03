@@ -1,57 +1,28 @@
-import { useRef, useState } from "react";
-import { IRefPhaserGame, PhaserGame } from "./PhaserGame";
-import { ClashGameState } from "@clash/shared";
+import { PhaserGame } from "./PhaserGame";
+import { Lobby } from "./components/Lobby";
+import { Hud } from "./components/Hud";
+import { useClash } from "./hooks/useClash";
+import "./ui.css";
 
 function App() {
-    //  References to the PhaserGame component (game and scene are exposed)
-    const phaserRef = useRef<IRefPhaserGame | null>(null);
-    const [gameState, setGameState] = useState<ClashGameState | null>(null);
+    const api = useClash();
 
-    const handleGameStateUpdate = (newGameState: ClashGameState) => {
-        setGameState(newGameState);
-    };
+    if (api.screen !== "game") {
+        return (
+            <div id="app">
+                <Lobby api={api} />
+            </div>
+        );
+    }
 
     return (
         <div id="app">
-            <PhaserGame
-                ref={phaserRef}
-                onGameStateUpdate={handleGameStateUpdate}
-            />
-            <div
-                style={{
-                    position: "absolute",
-                    top: "10px",
-                    right: "10px",
-                    backgroundColor: "rgba(0, 0, 0, 0.8)",
-                    color: "#00ff00",
-                    padding: "15px",
-                    borderRadius: "5px",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    maxWidth: "400px",
-                    maxHeight: "90vh",
-                    overflow: "auto",
-                    border: "2px solid #00ff00",
-                }}
-            >
-                <h3 style={{ margin: "0 0 10px 0", color: "#00ff00" }}>
-                    Debug: Game State
-                </h3>
-                <pre
-                    style={{
-                        margin: 0,
-                        whiteSpace: "pre-wrap",
-                        wordBreak: "break-word",
-                    }}
-                >
-                    {gameState
-                        ? JSON.stringify(gameState, null, 2)
-                        : "No game state yet"}
-                </pre>
+            <div className="board-wrap">
+                <PhaserGame />
+                <Hud api={api} />
             </div>
         </div>
     );
 }
 
 export default App;
-

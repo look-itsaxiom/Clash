@@ -6,7 +6,7 @@ import { createRequire } from "node:module";
 // regardless of the ESM/CJS interop heuristics.
 const require = createRequire(import.meta.url);
 const { CARDS, createGame, createPlayer, legalMoves, submit, resolve, rematch, viewFor } =
-  require("../dist/index.js");
+  require("../dist/cjs/index.js");
 
 function game() {
   return createGame("g1", createPlayer("p0", "Alice"), createPlayer("p1", "Bob"));

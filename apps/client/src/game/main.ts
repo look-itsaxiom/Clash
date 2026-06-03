@@ -1,14 +1,19 @@
 import { Game as MainGame } from "./scenes/Game";
-import { AUTO, Game, Types } from "phaser";
+import { AUTO, Game, Scale, Types } from "phaser";
 
-// Find out more information about the Game Config at:
-// https://docs.phaser.io/api-documentation/typedef/types-core#gameconfig
+export const BOARD_WIDTH = 960;
+export const BOARD_HEIGHT = 640;
+
 const config: Types.Core.GameConfig = {
     type: AUTO,
-    width: 800,
-    height: 600,
+    width: BOARD_WIDTH,
+    height: BOARD_HEIGHT,
     parent: "game-container",
-    backgroundColor: "#028af8",
+    backgroundColor: "#0b1020",
+    scale: {
+        mode: Scale.FIT,
+        autoCenter: Scale.CENTER_BOTH,
+    },
     scene: [MainGame],
 };
 
@@ -17,4 +22,3 @@ const StartGame = (parent: string) => {
 };
 
 export default StartGame;
-
