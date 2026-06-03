@@ -9,14 +9,14 @@ function App() {
 
     if (api.screen !== "game") {
         return (
-            <div id="app">
+            <div id="app" className="app-lobby">
                 <Lobby api={api} />
             </div>
         );
     }
 
     return (
-        <div id="app">
+        <div id="app" className="app-game">
             <div className="board-wrap">
                 <PhaserGame />
                 <Hud api={api} />

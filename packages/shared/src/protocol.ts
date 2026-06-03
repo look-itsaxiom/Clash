@@ -34,6 +34,8 @@ export interface ClientToServerEvents {
   "lobby:join_room": (payload: { roomCode: string; name?: string }) => void;
   "game:submit": (payload: { card: Move }) => void;
   "game:rematch": () => void;
+  /** Leave the current match (forfeit if still in progress). */
+  "game:leave": () => void;
   /** Reattach to an in-progress game after a reload/disconnect. */
   "game:resume": (payload: { token: string }) => void;
 }

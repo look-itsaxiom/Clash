@@ -111,6 +111,59 @@ describe("Clash multiplayer (e2e)", () => {
     expect(Math.min(final.you.hearts, final.opponent.hearts)).toBe(0);
   });
 
+  it("lets both players queue again after a finished game", async () => {
+    const a = connect();
+    const b = connect();
+
+    const playToEnd = () =>
+      new Promise<void>((resolve) => {
+        let done = false;
+        const handlers: Array<() => void> = [];
+        for (const sock of [a, b]) {
+          const step = (state: ClientGameState) => {
+            if (state.phase === "SELECTING") sock.emit("game:submit", { card: pick(state.you.legalMoves) });
+          };
+          const onStart = ({ state }: { state: ClientGameState }) => step(state);
+          const onReveal = ({ state }: { state: ClientGameState }) => step(state);
+          const onOver = () => {
+            if (!done) {
+              done = true;
+              resolve();
+            }
+          };
+          sock.on("game:start", onStart);
+          sock.on("game:reveal", onReveal);
+          sock.on("game:over", onOver);
+          handlers.push(() => {
+            sock.off("game:start", onStart);
+            sock.off("game:reveal", onReveal);
+            sock.off("game:over", onOver);
+          });
+        }
+        // Detach this game's listeners once it ends so the next game starts clean.
+        const cleanup = () => handlers.forEach((h) => h());
+        a.once("game:over", cleanup);
+      });
+
+    a.emit("lobby:queue", { name: "Alice" });
+    b.emit("lobby:queue", { name: "Bob" });
+    await playToEnd();
+
+    // Leave the finished match, then both queue again — this previously hung
+    // because the finished room still bound each player.
+    a.emit("game:leave");
+    b.emit("game:leave");
+
+    const restartA = once<{ state: ClientGameState }>(a, "game:start");
+    const restartB = once<{ state: ClientGameState }>(b, "game:start");
+    a.emit("lobby:queue", { name: "Alice" });
+    b.emit("lobby:queue", { name: "Bob" });
+    const [{ state: a2 }, { state: b2 }] = await Promise.all([restartA, restartB]);
+    expect(a2.phase).toBe("SELECTING");
+    expect(a2.you.hearts).toBe(3);
+    expect(b2.opponent.name).toBe("Alice");
+  });
+
   it("connects two players through a private room code", async () => {
     const host = connect();
     const guest = connect();

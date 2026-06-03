@@ -2,6 +2,7 @@ import { Scene } from "phaser";
 import { CARDS, MAX_HEARTS, type CardId, type ClientGameState, type Move, type TurnResult } from "@clash/shared";
 import { EventBus } from "../EventBus";
 import { ClashEvent, type RevealPayload } from "../events";
+import { SUPERSAMPLE, logicalBoardSize } from "../constants";
 
 const PALETTE: Record<CardId, number> = {
   ATTACK: 0xe0524a,
@@ -68,33 +69,62 @@ interface Metrics {
  * so the visuals can never desync from the authoritative state.
  */
 export class Game extends Scene {
+  private bg!: Phaser.GameObjects.Graphics;
   private board!: Phaser.GameObjects.Container;
   private fx!: Phaser.GameObjects.Container;
   private view: ClientGameState | null = null;
   private submitting = false;
   private alive = false;
+  private readonly onWindowResize = () => this.syncOrientation();
 
   constructor() {
     super("Game");
   }
 
   create() {
-    this.drawBackdrop(); // persistent background, added before the rebuilt layers
+    this.bg = this.add.graphics(); // persistent background, behind the rebuilt layers
     this.board = this.add.container(0, 0);
     this.fx = this.add.container(0, 0);
+    this.drawBackdrop();
 
     EventBus.on(ClashEvent.View, this.onView, this);
     EventBus.on(ClashEvent.Reveal, this.onReveal, this);
+    // Re-render whenever the canvas dimensions change (orientation / resize).
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.onCanvasResize, this);
+    window.addEventListener("resize", this.onWindowResize);
+    window.addEventListener("orientationchange", this.onWindowResize);
+
     const cleanup = () => {
       this.alive = false;
       EventBus.off(ClashEvent.View, this.onView, this);
       EventBus.off(ClashEvent.Reveal, this.onReveal, this);
+      this.scale.off(Phaser.Scale.Events.RESIZE, this.onCanvasResize, this);
+      window.removeEventListener("resize", this.onWindowResize);
+      window.removeEventListener("orientationchange", this.onWindowResize);
     };
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup);
     this.events.once(Phaser.Scenes.Events.DESTROY, cleanup);
 
     this.alive = true;
+    this.syncOrientation();
     EventBus.emit(ClashEvent.Ready);
+  }
+
+  /** Swap the canvas between landscape and portrait aspect to match the viewport. */
+  private syncOrientation() {
+    if (!this.alive) return;
+    const { width, height } = logicalBoardSize();
+    const w = width * SUPERSAMPLE;
+    const h = height * SUPERSAMPLE;
+    if (this.scale.width !== w || this.scale.height !== h) {
+      this.scale.setGameSize(w, h);
+    }
+  }
+
+  private onCanvasResize() {
+    if (!this.alive) return;
+    this.drawBackdrop();
+    if (this.view) this.renderView(this.view);
   }
 
   // ---- layout ---------------------------------------------------------------
@@ -102,11 +132,15 @@ export class Game extends Scene {
   private metrics(): Metrics {
     const W = this.scale.width;
     const H = this.scale.height;
-    const pad = W * 0.018;
-    const panelW = W * 0.21;
-    const panelH = H * 0.135;
-    const handCardH = H * 0.135;
-    const slotCardH = H * 0.17;
+    // Size everything off the smaller dimension so cards and text stay sensible
+    // in both wide (landscape) and tall (portrait) aspect ratios.
+    const u = Math.min(W, H);
+    const portrait = H > W;
+    const pad = u * 0.022;
+    const panelW = portrait ? Math.min(W * 0.72, u * 0.82) : u * 0.3;
+    const panelH = u * 0.13;
+    const handCardH = u * 0.155;
+    const slotCardH = u * 0.2;
     return {
       W,
       H,
@@ -115,16 +149,20 @@ export class Game extends Scene {
       handCardH,
       slotCardW: slotCardH * 0.7,
       slotCardH,
-      oppPanel: { x: pad, y: pad, w: panelW, h: panelH },
-      youPanel: { x: pad, y: H - pad - panelH, w: panelW, h: panelH },
-      oppHandY: H * 0.115,
-      oppSlotY: H * 0.35,
-      vsY: H * 0.5,
-      youSlotY: H * 0.65,
+      oppPanel: portrait
+        ? { x: (W - panelW) / 2, y: pad, w: panelW, h: panelH }
+        : { x: pad, y: pad, w: panelW, h: panelH },
+      youPanel: portrait
+        ? { x: (W - panelW) / 2, y: H * 0.705, w: panelW, h: panelH }
+        : { x: pad, y: H - pad - panelH, w: panelW, h: panelH },
+      oppHandY: portrait ? H * 0.2 : H * 0.115,
+      oppSlotY: portrait ? H * 0.33 : H * 0.35,
+      vsY: portrait ? H * 0.46 : H * 0.5,
+      youSlotY: portrait ? H * 0.59 : H * 0.65,
       youHandY: H * 0.875,
-      fontName: Math.round(H * 0.03),
-      fontHeart: Math.round(H * 0.05),
-      fontSmall: Math.round(H * 0.022),
+      fontName: Math.round(u * 0.035),
+      fontHeart: Math.round(u * 0.055),
+      fontSmall: Math.round(u * 0.026),
     };
   }
 
@@ -243,8 +281,8 @@ export class Game extends Scene {
   }
 
   private drawFaceDownRow(count: number, y: number, m: Metrics) {
-    const w = m.W * 0.026;
-    const h = m.H * 0.072;
+    const w = m.handCardH * 0.32;
+    const h = m.handCardH * 0.46;
     const gap = w * 0.5;
     const total = count * w + (count - 1) * gap;
     const startX = m.cx - total / 2 + w / 2;
@@ -266,14 +304,15 @@ export class Game extends Scene {
     g.lineBetween(m.W * 0.57, m.vsY, m.W * 0.72, m.vsY);
     this.board.add(g);
 
+    const u = Math.min(m.W, m.H);
     const ready = view.phase === "SELECTING" && view.opponent.hasSelected;
     const t = this.add
-      .text(m.cx, m.vsY, "VS", { fontSize: `${Math.round(m.H * 0.04)}px`, color: "#5566aa", fontStyle: "bold" })
+      .text(m.cx, m.vsY, "VS", { fontSize: `${Math.round(u * 0.045)}px`, color: "#5566aa", fontStyle: "bold" })
       .setOrigin(0.5);
     this.board.add(t);
     if (ready) {
       const dot = this.add
-        .text(m.cx, m.vsY + m.H * 0.04, "● opponent ready", { fontSize: `${m.fontSmall}px`, color: "#88e6b6" })
+        .text(m.cx, m.vsY + u * 0.055, "● opponent ready", { fontSize: `${m.fontSmall}px`, color: "#88e6b6" })
         .setOrigin(0.5);
       this.board.add(dot);
     }
@@ -419,9 +458,10 @@ export class Game extends Scene {
   }
 
   private floatText(text: string, x: number, y: number, color: string, m: Metrics) {
-    const t = this.add.text(x, y, text, { fontSize: `${Math.round(m.H * 0.04)}px`, color, fontStyle: "bold" }).setOrigin(0, 0.5);
+    const u = Math.min(m.W, m.H);
+    const t = this.add.text(x, y, text, { fontSize: `${Math.round(u * 0.05)}px`, color, fontStyle: "bold" }).setOrigin(0, 0.5);
     this.fx.add(t);
-    this.tweens.add({ targets: t, y: y - m.H * 0.06, alpha: 0, duration: 950, ease: "Quad.out", onComplete: () => t.destroy() });
+    this.tweens.add({ targets: t, y: y - u * 0.07, alpha: 0, duration: 950, ease: "Quad.out", onComplete: () => t.destroy() });
   }
 
   private flip(card: Phaser.GameObjects.Container, faceCard: CardId | null, delay: number, m: Metrics) {
@@ -444,13 +484,13 @@ export class Game extends Scene {
   private drawBackdrop() {
     const W = this.scale.width;
     const H = this.scale.height;
-    const g = this.add.graphics();
+    const g = this.bg;
+    g.clear();
     g.fillGradientStyle(0x0b1020, 0x0b1020, 0x141d3a, 0x141d3a, 1);
     g.fillRect(0, 0, W, H);
     // A subtle central stage band to anchor the duel.
     g.fillStyle(0x162043, 0.45);
     g.fillRect(0, H * 0.22, W, H * 0.56);
-    // Left on the scene root (not the rebuilt board layer) so it persists.
   }
 }
 

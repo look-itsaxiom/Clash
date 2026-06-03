@@ -90,6 +90,7 @@ export class GameService {
   queueRandom(socket: GameSocket, name?: string): void {
     const playerId = this.idOf(socket);
     this.pendingName.set(playerId, sanitizeName(name));
+    this.releaseIfFinished(playerId);
     if (this.playerRoom.has(playerId) || this.queue.includes(playerId)) return;
 
     const waiting = this.queue.shift();
@@ -108,6 +109,7 @@ export class GameService {
   createRoom(socket: GameSocket, name?: string): void {
     const playerId = this.idOf(socket);
     this.pendingName.set(playerId, sanitizeName(name));
+    this.releaseIfFinished(playerId);
     const code = this.freshRoomCode();
     this.pendingRooms.set(code, this.seatFor(playerId));
     this.emit(playerId, "lobby:room_created", { roomCode: code });
@@ -116,6 +118,7 @@ export class GameService {
 
   joinRoom(socket: GameSocket, roomCode: string, name?: string): void {
     const playerId = this.idOf(socket);
+    this.releaseIfFinished(playerId);
     const code = roomCode.trim().toUpperCase();
     const host = this.pendingRooms.get(code);
     if (!host) {
@@ -164,6 +167,38 @@ export class GameService {
       this.broadcast(room, "game:start", (pid) => ({ state: viewFor(room.state, pid) }));
       this.startTurnTimer(room);
     }
+  }
+
+  /** A player explicitly leaves a match (clicked "Leave"). */
+  leaveGame(socket: GameSocket): void {
+    const playerId = this.idOf(socket);
+    const room = this.roomOf(playerId);
+    if (!room) return;
+
+    // Leaving mid-game is a forfeit; leaving a finished game just frees the seat.
+    if (room.state.phase !== "FINISHED") {
+      this.forfeit(room, playerId);
+      return;
+    }
+    const opponent = this.opponentSeat(room, playerId);
+    if (opponent && this.playerRoom.get(opponent.playerId) === room.id) {
+      this.emit(opponent.playerId, "game:opponent_left", { name: this.nameOf(room, playerId) });
+    }
+    this.releaseIfFinished(playerId);
+  }
+
+  /**
+   * Detaches a player from a room they are still mapped to only because it
+   * finished, so they are free to queue or host again. Disposes the room once
+   * neither player references it.
+   */
+  private releaseIfFinished(playerId: string): void {
+    const room = this.roomOf(playerId);
+    if (!room || room.state.phase !== "FINISHED") return;
+    this.playerRoom.delete(playerId);
+    room.rematchVotes.delete(playerId);
+    const stillReferenced = room.seats.some((s) => this.playerRoom.get(s.playerId) === room.id);
+    if (!stillReferenced) this.disposeRoom(room);
   }
 
   resume(socket: GameSocket, token: string): void {

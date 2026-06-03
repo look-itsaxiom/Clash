@@ -72,6 +72,11 @@ export class GameGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     this.games.rematchVote(socket);
   }
 
+  @SubscribeMessage("game:leave")
+  onLeave(@ConnectedSocket() socket: GameSocket): void {
+    this.games.leaveGame(socket);
+  }
+
   @SubscribeMessage("game:resume")
   onResume(@ConnectedSocket() socket: GameSocket, @MessageBody() data: { token: string }): void {
     this.games.resume(socket, data.token);

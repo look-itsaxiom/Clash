@@ -173,6 +173,7 @@ export function useClash(): ClashApi {
   }, []);
 
   const leave = useCallback(() => {
+    socketRef.current?.emit("game:leave");
     localStorage.removeItem(TOKEN_KEY);
     viewRef.current = null;
     setView(null);
