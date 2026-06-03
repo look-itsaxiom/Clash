@@ -2,12 +2,6 @@ import { Scene } from "phaser";
 import { CARDS, MAX_HEARTS, type CardId, type ClientGameState, type Move, type TurnResult } from "@clash/shared";
 import { EventBus } from "../EventBus";
 import { ClashEvent, type RevealPayload } from "../events";
-import { BOARD_HEIGHT, BOARD_WIDTH } from "../constants";
-
-const CX = BOARD_WIDTH / 2;
-const CARD_W = 88;
-const CARD_H = 122;
-const HAND_GAP = 12;
 
 const PALETTE: Record<CardId, number> = {
   ATTACK: 0xe0524a,
@@ -17,35 +11,67 @@ const PALETTE: Record<CardId, number> = {
   RECHARGE: 0xf4a261,
 };
 
+const COLOR_CARD = 0x141a30;
 const COLOR_BACK = 0x1b2440;
 const COLOR_BORDER = 0x3a4a82;
-const COLOR_EMPTY = 0x33406b;
+const COLOR_EMPTY = 0x2a3563;
+const COLOR_PANEL = 0x111a36;
+const ACCENT_YOU = 0x52b788;
+const ACCENT_OPP = 0x8893ff;
 
-const LAYOUT = {
-  oppName: 30,
-  oppHearts: 66,
-  oppHand: 134,
-  oppSlot: 254,
-  vs: 362,
-  youSlot: 468,
-  youHearts: 558,
-  youName: 585,
-  youHand: 658,
-};
+interface Panel {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+interface Metrics {
+  W: number;
+  H: number;
+  cx: number;
+  handCardW: number;
+  handCardH: number;
+  slotCardW: number;
+  slotCardH: number;
+  oppPanel: Panel;
+  youPanel: Panel;
+  oppHandY: number;
+  oppSlotY: number;
+  vsY: number;
+  youSlotY: number;
+  youHandY: number;
+  fontName: number;
+  fontHeart: number;
+  fontSmall: number;
+}
 
 /**
  * Pure-presentation board. It never decides anything about the rules — it only
  * renders whatever {@link ClientGameState} the server (via React) hands it and
- * emits the player's chosen move back over the EventBus. Rendering is
- * idempotent: every update rebuilds the board layer from scratch, which keeps
- * the visual state impossible to desync from the authoritative state.
+ * emits the player's chosen move back over the EventBus.
+ *
+ * Layout is fully proportional to the (supersampled) canvas size and split into
+ * dedicated regions:
+ *
+ *   ┌ opponent info ┐                         (HUD: turn/timer / log)
+ *   │  name·hearts  │      · opponent hand ·
+ *   └───────────────┘
+ *                       [ opponent's card ]
+ *   ───────────────────────── VS ─────────────────────────
+ *                       [   your card    ]
+ *   ┌  your info  ┐
+ *   │ name·hearts │       ·  your hand  ·
+ *   └─────────────┘
+ *
+ * Rendering is idempotent: every update rebuilds the board layer from scratch,
+ * so the visuals can never desync from the authoritative state.
  */
 export class Game extends Scene {
   private board!: Phaser.GameObjects.Container;
   private fx!: Phaser.GameObjects.Container;
   private view: ClientGameState | null = null;
   private submitting = false;
-  /** True only between create() and shutdown/destroy; gates async EventBus callbacks. */
   private alive = false;
 
   constructor() {
@@ -53,16 +79,12 @@ export class Game extends Scene {
   }
 
   create() {
-    this.drawBackdrop();
+    this.drawBackdrop(); // persistent background, added before the rebuilt layers
     this.board = this.add.container(0, 0);
     this.fx = this.add.container(0, 0);
 
     EventBus.on(ClashEvent.View, this.onView, this);
     EventBus.on(ClashEvent.Reveal, this.onReveal, this);
-    // Tear down on BOTH shutdown and destroy: `game.destroy()` (React unmount /
-    // StrictMode's dev double-mount) emits DESTROY, not SHUTDOWN, so listening
-    // only for SHUTDOWN would leak this scene's listeners and let a torn-down
-    // instance try to render onto a nulled board.
     const cleanup = () => {
       this.alive = false;
       EventBus.off(ClashEvent.View, this.onView, this);
@@ -72,8 +94,38 @@ export class Game extends Scene {
     this.events.once(Phaser.Scenes.Events.DESTROY, cleanup);
 
     this.alive = true;
-    // Ask React for the current authoritative view now that we can draw it.
     EventBus.emit(ClashEvent.Ready);
+  }
+
+  // ---- layout ---------------------------------------------------------------
+
+  private metrics(): Metrics {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    const pad = W * 0.018;
+    const panelW = W * 0.21;
+    const panelH = H * 0.135;
+    const handCardH = H * 0.135;
+    const slotCardH = H * 0.17;
+    return {
+      W,
+      H,
+      cx: W / 2,
+      handCardW: handCardH * 0.7,
+      handCardH,
+      slotCardW: slotCardH * 0.7,
+      slotCardH,
+      oppPanel: { x: pad, y: pad, w: panelW, h: panelH },
+      youPanel: { x: pad, y: H - pad - panelH, w: panelW, h: panelH },
+      oppHandY: H * 0.115,
+      oppSlotY: H * 0.35,
+      vsY: H * 0.5,
+      youSlotY: H * 0.65,
+      youHandY: H * 0.875,
+      fontName: Math.round(H * 0.03),
+      fontHeart: Math.round(H * 0.05),
+      fontSmall: Math.round(H * 0.022),
+    };
   }
 
   // ---- event handlers -------------------------------------------------------
@@ -93,174 +145,199 @@ export class Game extends Scene {
   // ---- rendering ------------------------------------------------------------
 
   private renderView(view: ClientGameState) {
+    const m = this.metrics();
     this.board.removeAll(true);
-    // A fresh selection turn clears the local submit lock, whether we arrived
-    // here from a plain state update or from the reveal animation settling.
+    // A fresh selection turn clears the local submit lock, whether we got here
+    // from a plain state update or from the reveal animation settling.
     if (view.phase === "SELECTING" && !view.you.selected) this.submitting = false;
-    const youSelectable = view.phase === "SELECTING" && !view.you.selected && !this.submitting;
+    const selectable = view.phase === "SELECTING" && !view.you.selected && !this.submitting;
 
-    this.label(view.opponent.name + (view.opponent.connected ? "" : "  (away)"), CX, LAYOUT.oppName, 20, "#c7d2fe");
-    this.drawHearts(view.opponent.hearts, LAYOUT.oppHearts);
-    this.drawFaceDownRow(view.opponent.handCount, LAYOUT.oppHand);
+    this.drawInfoPanel(m.oppPanel, view.opponent.name, view.opponent.hearts, view.opponent.connected, view.opponent.handCount, ACCENT_OPP, m);
+    this.drawInfoPanel(m.youPanel, view.you.name, view.you.hearts, view.you.connected, view.you.hand.length, ACCENT_YOU, m);
 
-    // Opponent's committed card: a face-down card while hidden, the real card on reveal.
-    if (view.opponent.selected) this.placeCard(CX, LAYOUT.oppSlot, asCardOrNull(view.opponent.selected), false, false);
-    else if (view.opponent.hasSelected) this.placeCard(CX, LAYOUT.oppSlot, null, true, false);
-    else this.placeCard(CX, LAYOUT.oppSlot, null, false, true);
+    this.drawFaceDownRow(view.opponent.handCount, m.oppHandY, m);
+    this.drawVs(view, m);
 
-    this.drawVs(view);
+    // Opponent's committed card: face-down while hidden, revealed otherwise.
+    if (view.opponent.selected) this.placeCard(m.cx, m.oppSlotY, asCardOrNull(view.opponent.selected), false, false, m.slotCardW, m.slotCardH);
+    else if (view.opponent.hasSelected) this.placeCard(m.cx, m.oppSlotY, null, true, false, m.slotCardW, m.slotCardH);
+    else this.placeCard(m.cx, m.oppSlotY, null, false, true, m.slotCardW, m.slotCardH);
 
     // Your committed card (if you have locked in this turn).
-    if (view.you.selected) this.placeCard(CX, LAYOUT.youSlot, asCardOrNull(view.you.selected), false, false);
-    else this.placeCard(CX, LAYOUT.youSlot, null, false, true);
+    if (view.you.selected) this.placeCard(m.cx, m.youSlotY, asCardOrNull(view.you.selected), false, false, m.slotCardW, m.slotCardH);
+    else this.placeCard(m.cx, m.youSlotY, null, false, true, m.slotCardW, m.slotCardH);
 
-    this.drawHearts(view.you.hearts, LAYOUT.youHearts);
-    this.label(view.you.name, CX, LAYOUT.youName, 18, "#a7f3d0");
-    this.drawHand(view.you.hand, LAYOUT.youHand, youSelectable);
+    this.drawHand(view.you.hand, m, selectable);
   }
 
   private renderReveal(state: ClientGameState, result: TurnResult) {
+    const m = this.metrics();
     this.board.removeAll(true);
     this.fx.removeAll(true);
 
     const youEntry = result.entries.find((e) => e.playerId === state.you.id)!;
     const oppEntry = result.entries.find((e) => e.playerId === state.opponent.id)!;
 
-    // Freeze hearts at their pre-turn values during the reveal, then settle.
-    this.label(state.opponent.name, CX, LAYOUT.oppName, 20, "#c7d2fe");
-    this.drawHearts(oppEntry.heartsBefore, LAYOUT.oppHearts);
-    this.label(state.you.name, CX, LAYOUT.youName, 18, "#a7f3d0");
-    this.drawHearts(youEntry.heartsBefore, LAYOUT.youHearts);
-    this.drawVs(state);
+    // Freeze the panels at their pre-turn hearts during the reveal, then settle.
+    this.drawInfoPanel(m.oppPanel, state.opponent.name, oppEntry.heartsBefore, state.opponent.connected, state.opponent.handCount, ACCENT_OPP, m);
+    this.drawInfoPanel(m.youPanel, state.you.name, youEntry.heartsBefore, state.you.connected, state.you.hand.length, ACCENT_YOU, m);
+    this.drawVs(state, m);
 
-    const oppCard = this.placeCard(CX, LAYOUT.oppSlot, null, true, false);
-    const youCard = this.placeCard(CX, LAYOUT.youSlot, null, true, false);
+    const oppCard = this.placeCard(m.cx, m.oppSlotY, null, true, false, m.slotCardW, m.slotCardH);
+    const youCard = this.placeCard(m.cx, m.youSlotY, null, true, false, m.slotCardW, m.slotCardH);
 
-    // Flip both cards face-up with a quick scale, staggered for drama.
-    this.flip(oppCard, asCardOrNull(oppEntry.card), 120);
-    this.flip(youCard, asCardOrNull(youEntry.card), 260);
+    this.flip(oppCard, asCardOrNull(oppEntry.card), 120, m);
+    this.flip(youCard, asCardOrNull(youEntry.card), 260, m);
 
-    // Damage / heal feedback timed to land just after the flip.
-    this.time.delayedCall(620, () => {
-      this.applyFloaters(youEntry, LAYOUT.youHearts);
-      this.applyFloaters(oppEntry, LAYOUT.oppHearts);
-      this.drawHearts(youEntry.heartsAfter, LAYOUT.youHearts);
-      this.drawHearts(oppEntry.heartsAfter, LAYOUT.oppHearts);
+    this.time.delayedCall(640, () => {
+      this.applyFloaters(youEntry, m.youPanel, m);
+      this.applyFloaters(oppEntry, m.oppPanel, m);
+      this.drawInfoPanel(m.youPanel, state.you.name, youEntry.heartsAfter, state.you.connected, state.you.hand.length, ACCENT_YOU, m);
+      this.drawInfoPanel(m.oppPanel, state.opponent.name, oppEntry.heartsAfter, state.opponent.connected, state.opponent.handCount, ACCENT_OPP, m);
     });
 
-    // Settle onto the real next-turn view.
-    this.time.delayedCall(1150, () => {
+    this.time.delayedCall(1200, () => {
       if (this.view === state) this.renderView(state);
     });
   }
 
   // ---- pieces ---------------------------------------------------------------
 
-  private placeCard(
-    x: number,
-    y: number,
-    card: CardId | null,
-    faceDown: boolean,
-    empty: boolean,
-  ): Phaser.GameObjects.Container {
-    const c = this.makeCard(card, faceDown, empty);
-    c.setPosition(x, y);
-    this.board.add(c);
-    return c;
-  }
-
-  private makeCard(card: CardId | null, faceDown: boolean, empty: boolean): Phaser.GameObjects.Container {
-    const c = this.add.container(0, 0);
+  private drawInfoPanel(p: Panel, name: string, hearts: number, connected: boolean, handCount: number, accent: number, m: Metrics) {
     const g = this.add.graphics();
+    g.fillStyle(COLOR_PANEL, 0.82);
+    g.fillRoundedRect(p.x, p.y, p.w, p.h, 14);
+    g.lineStyle(2, accent, 0.5);
+    g.strokeRoundedRect(p.x, p.y, p.w, p.h, 14);
+    g.fillStyle(accent, 1);
+    g.fillRoundedRect(p.x, p.y, 7, p.h, { tl: 14, bl: 14, tr: 0, br: 0 });
+    this.board.add(g);
 
-    if (empty) {
-      g.lineStyle(2, COLOR_EMPTY, 0.9);
-      g.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 12);
-      c.add(g);
-      return c;
-    }
+    const padX = p.x + p.w * 0.09;
+    const nameText = this.add
+      .text(padX, p.y + p.h * 0.16, connected ? name : `${name} (away)`, {
+        fontSize: `${m.fontName}px`,
+        color: connected ? "#e7ecff" : "#8893b8",
+        fontStyle: "bold",
+      })
+      .setOrigin(0, 0.5);
+    this.board.add(nameText);
 
-    if (faceDown || !card) {
-      g.fillStyle(COLOR_BACK, 1);
-      g.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 12);
-      g.lineStyle(2, COLOR_BORDER, 1);
-      g.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 12);
-      c.add(g);
-      const mark = this.add.text(0, 0, "⚔", { fontSize: "34px", color: "#3a4a82" }).setOrigin(0.5);
-      c.add(mark);
-      return c;
-    }
+    this.drawHearts(padX, p.y + p.h * 0.52, hearts, m.fontHeart);
 
-    const def = CARDS[card];
-    const accent = PALETTE[card];
-    g.fillStyle(0x141a30, 1);
-    g.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 12);
-    g.lineStyle(2.5, accent, 1);
-    g.strokeRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, CARD_H, 12);
-    g.fillStyle(accent, 0.22);
-    g.fillRoundedRect(-CARD_W / 2, -CARD_H / 2, CARD_W, 30, { tl: 12, tr: 12, bl: 0, br: 0 });
-    c.add(g);
-
-    const emoji = this.add.text(0, -8, def.emoji, { fontSize: "40px" }).setOrigin(0.5);
-    const name = this.add
-      .text(0, 44, def.name.toUpperCase(), { fontSize: "12px", color: "#cdd6f4", fontStyle: "bold" })
-      .setOrigin(0.5);
-    c.add(emoji);
-    c.add(name);
-    if (def.oneTime) {
-      const warn = this.add.text(CARD_W / 2 - 14, -CARD_H / 2 + 14, "⚠", { fontSize: "14px" }).setOrigin(0.5);
-      c.add(warn);
-    }
-    return c;
+    const cards = this.add
+      .text(padX, p.y + p.h * 0.84, `${handCount} card${handCount === 1 ? "" : "s"} in hand`, {
+        fontSize: `${m.fontSmall}px`,
+        color: "#8893b8",
+      })
+      .setOrigin(0, 0.5);
+    this.board.add(cards);
   }
 
-  private drawHand(hand: CardId[], y: number, selectable: boolean) {
+  private drawHearts(x: number, y: number, hearts: number, size: number) {
+    const spacing = size * 0.92;
+    for (let i = 0; i < MAX_HEARTS; i++) {
+      const alive = i < hearts;
+      const h = this.add
+        .text(x + i * spacing, y, alive ? "♥" : "♡", {
+          fontSize: `${size}px`,
+          color: alive ? "#ff5d73" : "#3a4570",
+        })
+        .setOrigin(0, 0.5);
+      this.board.add(h);
+    }
+  }
+
+  private drawFaceDownRow(count: number, y: number, m: Metrics) {
+    const w = m.W * 0.026;
+    const h = m.H * 0.072;
+    const gap = w * 0.5;
+    const total = count * w + (count - 1) * gap;
+    const startX = m.cx - total / 2 + w / 2;
+    for (let i = 0; i < count; i++) {
+      const g = this.add.graphics();
+      const x = startX + i * (w + gap);
+      g.fillStyle(COLOR_BACK, 1);
+      g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+      g.lineStyle(2, COLOR_BORDER, 1);
+      g.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+      this.board.add(g);
+    }
+  }
+
+  private drawVs(view: ClientGameState, m: Metrics) {
+    const g = this.add.graphics();
+    g.lineStyle(2, 0x26305a, 1);
+    g.lineBetween(m.W * 0.28, m.vsY, m.W * 0.43, m.vsY);
+    g.lineBetween(m.W * 0.57, m.vsY, m.W * 0.72, m.vsY);
+    this.board.add(g);
+
+    const ready = view.phase === "SELECTING" && view.opponent.hasSelected;
+    const t = this.add
+      .text(m.cx, m.vsY, "VS", { fontSize: `${Math.round(m.H * 0.04)}px`, color: "#5566aa", fontStyle: "bold" })
+      .setOrigin(0.5);
+    this.board.add(t);
+    if (ready) {
+      const dot = this.add
+        .text(m.cx, m.vsY + m.H * 0.04, "● opponent ready", { fontSize: `${m.fontSmall}px`, color: "#88e6b6" })
+        .setOrigin(0.5);
+      this.board.add(dot);
+    }
+  }
+
+  private drawHand(hand: CardId[], m: Metrics, selectable: boolean) {
+    const y = m.youHandY;
     if (hand.length === 0) {
-      this.label("— no cards — you must pass —", CX, y, 16, "#8893b8");
-      if (selectable) this.drawPassButton(y);
+      const t = this.add
+        .text(m.cx, y, "— no cards — you must pass —", { fontSize: `${m.fontName}px`, color: "#8893b8" })
+        .setOrigin(0.5);
+      this.board.add(t);
+      if (selectable) this.drawPassButton(m);
       return;
     }
-    const total = hand.length * CARD_W + (hand.length - 1) * HAND_GAP;
-    const startX = CX - total / 2 + CARD_W / 2;
+    const gap = m.handCardW * 0.16;
+    const total = hand.length * m.handCardW + (hand.length - 1) * gap;
+    const startX = m.cx - total / 2 + m.handCardW / 2;
 
     hand.forEach((card, i) => {
-      const x = startX + i * (CARD_W + HAND_GAP);
-      const c = this.makeCard(card, false, false);
+      const x = startX + i * (m.handCardW + gap);
+      const c = this.makeCard(card, false, false, m.handCardW, m.handCardH);
       c.setPosition(x, y);
       this.board.add(c);
 
       if (!selectable) {
-        c.setAlpha(0.55);
+        c.setAlpha(0.5);
         return;
       }
-      const hit = this.add.rectangle(x, y, CARD_W, CARD_H, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
+      const hit = this.add.rectangle(x, y, m.handCardW, m.handCardH, 0xffffff, 0.001).setInteractive({ useHandCursor: true });
       this.board.add(hit);
-      hit.on("pointerover", () => this.tweens.add({ targets: c, y: y - 18, duration: 120, ease: "Quad.out" }));
+      const lift = m.H * 0.03;
+      hit.on("pointerover", () => this.tweens.add({ targets: c, y: y - lift, duration: 120, ease: "Quad.out" }));
       hit.on("pointerout", () => this.tweens.add({ targets: c, y, duration: 120, ease: "Quad.out" }));
-      hit.on("pointerdown", () => this.choose(card, c));
+      hit.on("pointerdown", () => this.choose(card, c, m));
     });
   }
 
-  private choose(card: Move, cardObj: Phaser.GameObjects.Container) {
+  private choose(card: Move, cardObj: Phaser.GameObjects.Container, m: Metrics) {
     if (this.submitting) return;
     this.submitting = true;
     this.tweens.add({
       targets: cardObj,
-      x: CX,
-      y: LAYOUT.youSlot,
-      duration: 220,
+      x: m.cx,
+      y: m.youSlotY,
+      duration: 240,
       ease: "Quad.out",
       onComplete: () => EventBus.emit(ClashEvent.Play, card),
     });
   }
 
-  private drawPassButton(y: number) {
+  private drawPassButton(m: Metrics) {
     const btn = this.add
-      .text(CX, y + 34, "▶ Pass", {
-        fontSize: "18px",
+      .text(m.cx, m.youHandY + m.H * 0.06, "▶ Pass", {
+        fontSize: `${m.fontName}px`,
         color: "#cdd6f4",
         backgroundColor: "#26314f",
-        padding: { x: 14, y: 8 },
+        padding: { x: 20, y: 12 },
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
@@ -272,88 +349,104 @@ export class Game extends Scene {
     });
   }
 
-  private drawHearts(hearts: number, y: number) {
-    const spacing = 34;
-    const startX = CX - ((MAX_HEARTS - 1) * spacing) / 2;
-    for (let i = 0; i < MAX_HEARTS; i++) {
-      const alive = i < hearts;
-      const h = this.add
-        .text(startX + i * spacing, y, alive ? "♥" : "♡", {
-          fontSize: "28px",
-          color: alive ? "#ff5d73" : "#3a4570",
-        })
-        .setOrigin(0.5);
-      this.board.add(h);
-    }
+  private placeCard(x: number, y: number, card: CardId | null, faceDown: boolean, empty: boolean, w: number, h: number): Phaser.GameObjects.Container {
+    const c = this.makeCard(card, faceDown, empty, w, h);
+    c.setPosition(x, y);
+    this.board.add(c);
+    return c;
   }
 
-  private drawFaceDownRow(count: number, y: number) {
-    const w = 30;
-    const total = count * w;
-    const startX = CX - total / 2 + w / 2;
-    for (let i = 0; i < count; i++) {
-      const g = this.add.graphics();
-      const x = startX + i * w;
+  private makeCard(card: CardId | null, faceDown: boolean, empty: boolean, w: number, h: number): Phaser.GameObjects.Container {
+    const c = this.add.container(0, 0);
+    const g = this.add.graphics();
+    const r = Math.min(w, h) * 0.12;
+
+    if (empty) {
+      g.lineStyle(2, COLOR_EMPTY, 0.9);
+      g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+      c.add(g);
+      return c;
+    }
+
+    if (faceDown || !card) {
       g.fillStyle(COLOR_BACK, 1);
-      g.fillRoundedRect(x - 16, y - 22, 32, 44, 6);
-      g.lineStyle(1.5, COLOR_BORDER, 1);
-      g.strokeRoundedRect(x - 16, y - 22, 32, 44, 6);
-      this.board.add(g);
+      g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
+      g.lineStyle(2, COLOR_BORDER, 1);
+      g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+      c.add(g);
+      const mark = this.add.text(0, 0, "⚔", { fontSize: `${Math.round(h * 0.3)}px`, color: "#3a4a82" }).setOrigin(0.5);
+      c.add(mark);
+      return c;
     }
-  }
 
-  private drawVs(view: ClientGameState) {
-    const ready = view.phase === "SELECTING" && view.opponent.hasSelected ? "  ● opponent ready" : "";
-    const t = this.add
-      .text(CX, LAYOUT.vs, "VS" + ready, { fontSize: "22px", color: "#5566aa", fontStyle: "bold" })
+    const def = CARDS[card];
+    const accent = PALETTE[card];
+    g.fillStyle(COLOR_CARD, 1);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
+    g.lineStyle(3, accent, 1);
+    g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
+    g.fillStyle(accent, 0.22);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h * 0.26, { tl: r, tr: r, bl: 0, br: 0 });
+    c.add(g);
+
+    const emoji = this.add.text(0, -h * 0.08, def.emoji, { fontSize: `${Math.round(h * 0.34)}px` }).setOrigin(0.5);
+    const name = this.add
+      .text(0, h * 0.34, def.name.toUpperCase(), { fontSize: `${Math.round(h * 0.1)}px`, color: "#cdd6f4", fontStyle: "bold" })
       .setOrigin(0.5);
-    this.board.add(t);
+    c.add(emoji);
+    c.add(name);
+    if (def.oneTime) {
+      const warn = this.add.text(w / 2 - w * 0.16, -h / 2 + h * 0.12, "⚠", { fontSize: `${Math.round(h * 0.12)}px` }).setOrigin(0.5);
+      c.add(warn);
+    }
+    return c;
   }
 
-  private applyFloaters(entry: TurnResult["entries"][number], heartsY: number) {
+  private applyFloaters(entry: TurnResult["entries"][number], panel: Panel, m: Metrics) {
     const lost = entry.heartsBefore - entry.heartsAfter;
+    const x = panel.x + panel.w + m.W * 0.01;
+    const y = panel.y + panel.h * 0.52;
     if (lost > 0) {
-      this.floatText(`-${lost}`, CX + 90, heartsY, "#ff5d73");
+      this.floatText(`-${lost}`, x, y, "#ff5d73", m);
       this.cameras.main.shake(180, 0.004);
     }
-    if (entry.healed > 0) this.floatText(`+${entry.healed}`, CX + 90, heartsY, "#88e6b6");
-    if (entry.damageBlocked > 0 && lost === 0) this.floatText("blocked", CX + 100, heartsY, "#7fc0ff");
+    if (entry.healed > 0) this.floatText(`+${entry.healed}`, x, y, "#88e6b6", m);
+    if (entry.damageBlocked > 0 && lost === 0) this.floatText("blocked", x, y, "#7fc0ff", m);
   }
 
-  private floatText(text: string, x: number, y: number, color: string) {
-    const t = this.add.text(x, y, text, { fontSize: "26px", color, fontStyle: "bold" }).setOrigin(0.5);
+  private floatText(text: string, x: number, y: number, color: string, m: Metrics) {
+    const t = this.add.text(x, y, text, { fontSize: `${Math.round(m.H * 0.04)}px`, color, fontStyle: "bold" }).setOrigin(0, 0.5);
     this.fx.add(t);
-    this.tweens.add({ targets: t, y: y - 40, alpha: 0, duration: 900, ease: "Quad.out", onComplete: () => t.destroy() });
+    this.tweens.add({ targets: t, y: y - m.H * 0.06, alpha: 0, duration: 950, ease: "Quad.out", onComplete: () => t.destroy() });
   }
 
-  private flip(card: Phaser.GameObjects.Container, faceCard: CardId | null, delay: number) {
+  private flip(card: Phaser.GameObjects.Container, faceCard: CardId | null, delay: number, m: Metrics) {
     this.tweens.add({
       targets: card,
       scaleX: 0,
-      duration: 110,
+      duration: 120,
       delay,
       ease: "Quad.in",
       onComplete: () => {
         card.removeAll(true);
-        const face = this.makeCard(faceCard, false, false);
+        const face = this.makeCard(faceCard, false, false, m.slotCardW, m.slotCardH);
         face.list.slice().forEach((child) => card.add(child));
         face.destroy();
-        this.tweens.add({ targets: card, scaleX: 1, duration: 110, ease: "Quad.out" });
+        this.tweens.add({ targets: card, scaleX: 1, duration: 120, ease: "Quad.out" });
       },
     });
   }
 
-  private label(text: string, x: number, y: number, size: number, color: string) {
-    const t = this.add.text(x, y, text, { fontSize: `${size}px`, color, fontStyle: "bold" }).setOrigin(0.5);
-    this.board.add(t);
-  }
-
   private drawBackdrop() {
+    const W = this.scale.width;
+    const H = this.scale.height;
     const g = this.add.graphics();
     g.fillGradientStyle(0x0b1020, 0x0b1020, 0x141d3a, 0x141d3a, 1);
-    g.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
-    g.fillStyle(0x1a2348, 0.5);
-    g.fillRect(0, LAYOUT.vs - 30, BOARD_WIDTH, 60);
+    g.fillRect(0, 0, W, H);
+    // A subtle central stage band to anchor the duel.
+    g.fillStyle(0x162043, 0.45);
+    g.fillRect(0, H * 0.22, W, H * 0.56);
+    // Left on the scene root (not the rebuilt board layer) so it persists.
   }
 }
 

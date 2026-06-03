@@ -27,12 +27,12 @@
 }
 
 /* ---- board ---- */
-/* As large as possible while preserving the 1000x720 aspect ratio: limited by
-   width on tall screens and by height on wide ones. */
+/* As large as possible while preserving the 1280x800 (16:10) aspect ratio:
+   limited by width on tall screens and by height on wide ones. */
 .board-wrap {
   position: relative;
-  width: min(100vw, calc(100vh * (1000 / 720)));
-  height: min(100vh, calc(100vw * (720 / 1000)));
+  width: min(100vw, calc(100vh * (1280 / 800)));
+  height: min(100vh, calc(100vw * (800 / 1280)));
 }
 .game-container {
   width: 100%;
@@ -299,16 +299,17 @@
   margin-top: 8px;
   pointer-events: none;
 }
-/* Anchored to the top-left, clear of the hand and play slots. */
+/* Top-right corner — opposite the opponent info panel drawn on the canvas. */
 .turn-log {
   position: absolute;
-  left: 14px;
+  right: 16px;
   top: 70px;
-  max-width: 220px;
+  max-width: 240px;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: 12px;
+  font-size: 13px;
+  text-align: right;
   color: var(--muted);
   text-shadow: 0 1px 4px #000;
 }
