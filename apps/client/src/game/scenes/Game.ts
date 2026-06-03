@@ -152,8 +152,8 @@ export class Game extends Scene {
     if (view.phase === "SELECTING" && !view.you.selected) this.submitting = false;
     const selectable = view.phase === "SELECTING" && !view.you.selected && !this.submitting;
 
-    this.drawInfoPanel(m.oppPanel, view.opponent.name, view.opponent.hearts, view.opponent.connected, view.opponent.handCount, ACCENT_OPP, m);
-    this.drawInfoPanel(m.youPanel, view.you.name, view.you.hearts, view.you.connected, view.you.hand.length, ACCENT_YOU, m);
+    this.drawInfoPanel(m.oppPanel, view.opponent.name, view.opponent.hearts, view.opponent.connected, ACCENT_OPP, m);
+    this.drawInfoPanel(m.youPanel, view.you.name, view.you.hearts, view.you.connected, ACCENT_YOU, m);
 
     this.drawFaceDownRow(view.opponent.handCount, m.oppHandY, m);
     this.drawVs(view, m);
@@ -179,8 +179,8 @@ export class Game extends Scene {
     const oppEntry = result.entries.find((e) => e.playerId === state.opponent.id)!;
 
     // Freeze the panels at their pre-turn hearts during the reveal, then settle.
-    this.drawInfoPanel(m.oppPanel, state.opponent.name, oppEntry.heartsBefore, state.opponent.connected, state.opponent.handCount, ACCENT_OPP, m);
-    this.drawInfoPanel(m.youPanel, state.you.name, youEntry.heartsBefore, state.you.connected, state.you.hand.length, ACCENT_YOU, m);
+    this.drawInfoPanel(m.oppPanel, state.opponent.name, oppEntry.heartsBefore, state.opponent.connected, ACCENT_OPP, m);
+    this.drawInfoPanel(m.youPanel, state.you.name, youEntry.heartsBefore, state.you.connected, ACCENT_YOU, m);
     this.drawVs(state, m);
 
     const oppCard = this.placeCard(m.cx, m.oppSlotY, null, true, false, m.slotCardW, m.slotCardH);
@@ -192,8 +192,8 @@ export class Game extends Scene {
     this.time.delayedCall(640, () => {
       this.applyFloaters(youEntry, m.youPanel, m);
       this.applyFloaters(oppEntry, m.oppPanel, m);
-      this.drawInfoPanel(m.youPanel, state.you.name, youEntry.heartsAfter, state.you.connected, state.you.hand.length, ACCENT_YOU, m);
-      this.drawInfoPanel(m.oppPanel, state.opponent.name, oppEntry.heartsAfter, state.opponent.connected, state.opponent.handCount, ACCENT_OPP, m);
+      this.drawInfoPanel(m.youPanel, state.you.name, youEntry.heartsAfter, state.you.connected, ACCENT_YOU, m);
+      this.drawInfoPanel(m.oppPanel, state.opponent.name, oppEntry.heartsAfter, state.opponent.connected, ACCENT_OPP, m);
     });
 
     this.time.delayedCall(1200, () => {
@@ -203,7 +203,7 @@ export class Game extends Scene {
 
   // ---- pieces ---------------------------------------------------------------
 
-  private drawInfoPanel(p: Panel, name: string, hearts: number, connected: boolean, handCount: number, accent: number, m: Metrics) {
+  private drawInfoPanel(p: Panel, name: string, hearts: number, connected: boolean, accent: number, m: Metrics) {
     const g = this.add.graphics();
     g.fillStyle(COLOR_PANEL, 0.82);
     g.fillRoundedRect(p.x, p.y, p.w, p.h, 14);
@@ -215,7 +215,7 @@ export class Game extends Scene {
 
     const padX = p.x + p.w * 0.09;
     const nameText = this.add
-      .text(padX, p.y + p.h * 0.16, connected ? name : `${name} (away)`, {
+      .text(padX, p.y + p.h * 0.3, connected ? name : `${name} (away)`, {
         fontSize: `${m.fontName}px`,
         color: connected ? "#e7ecff" : "#8893b8",
         fontStyle: "bold",
@@ -223,25 +223,19 @@ export class Game extends Scene {
       .setOrigin(0, 0.5);
     this.board.add(nameText);
 
-    this.drawHearts(padX, p.y + p.h * 0.52, hearts, m.fontHeart);
-
-    const cards = this.add
-      .text(padX, p.y + p.h * 0.84, `${handCount} card${handCount === 1 ? "" : "s"} in hand`, {
-        fontSize: `${m.fontSmall}px`,
-        color: "#8893b8",
-      })
-      .setOrigin(0, 0.5);
-    this.board.add(cards);
+    this.drawHearts(padX, p.y + p.h * 0.68, hearts, m.fontHeart);
   }
 
   private drawHearts(x: number, y: number, hearts: number, size: number) {
     const spacing = size * 0.92;
     for (let i = 0; i < MAX_HEARTS; i++) {
       const alive = i < hearts;
+      // Same glyph for both states so the silhouette matches exactly — only the
+      // colour changes (a lost heart is a dark "ghost" of a full one).
       const h = this.add
-        .text(x + i * spacing, y, alive ? "♥" : "♡", {
+        .text(x + i * spacing, y, "♥", {
           fontSize: `${size}px`,
-          color: alive ? "#ff5d73" : "#3a4570",
+          color: alive ? "#ff5d73" : "#33406b",
         })
         .setOrigin(0, 0.5);
       this.board.add(h);
@@ -360,9 +354,10 @@ export class Game extends Scene {
     const c = this.add.container(0, 0);
     const g = this.add.graphics();
     const r = Math.min(w, h) * 0.12;
+    const lw = Math.max(2, h * 0.02);
 
     if (empty) {
-      g.lineStyle(2, COLOR_EMPTY, 0.9);
+      g.lineStyle(lw, COLOR_EMPTY, 0.9);
       g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
       c.add(g);
       return c;
@@ -371,7 +366,7 @@ export class Game extends Scene {
     if (faceDown || !card) {
       g.fillStyle(COLOR_BACK, 1);
       g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
-      g.lineStyle(2, COLOR_BORDER, 1);
+      g.lineStyle(lw, COLOR_BORDER, 1);
       g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
       c.add(g);
       const mark = this.add.text(0, 0, "⚔", { fontSize: `${Math.round(h * 0.3)}px`, color: "#3a4a82" }).setOrigin(0.5);
@@ -383,20 +378,29 @@ export class Game extends Scene {
     const accent = PALETTE[card];
     g.fillStyle(COLOR_CARD, 1);
     g.fillRoundedRect(-w / 2, -h / 2, w, h, r);
-    g.lineStyle(3, accent, 1);
+    // A slim accent stripe for colour identity (not a heavy header band).
+    g.fillStyle(accent, 0.9);
+    g.fillRoundedRect(-w / 2, -h / 2, w, h * 0.07, { tl: r, tr: r, bl: 0, br: 0 });
+    g.lineStyle(lw, accent, 1);
     g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
-    g.fillStyle(accent, 0.22);
-    g.fillRoundedRect(-w / 2, -h / 2, w, h * 0.26, { tl: r, tr: r, bl: 0, br: 0 });
     c.add(g);
 
-    const emoji = this.add.text(0, -h * 0.08, def.emoji, { fontSize: `${Math.round(h * 0.34)}px` }).setOrigin(0.5);
-    const name = this.add
-      .text(0, h * 0.34, def.name.toUpperCase(), { fontSize: `${Math.round(h * 0.1)}px`, color: "#cdd6f4", fontStyle: "bold" })
-      .setOrigin(0.5);
+    const emoji = this.add.text(0, -h * 0.11, def.emoji, { fontSize: `${Math.round(h * 0.32)}px` }).setOrigin(0.5);
     c.add(emoji);
+    // Wrap on the card width so longer names ("Heavy Attack") never spill out.
+    const name = this.add
+      .text(0, h * 0.27, def.name.toUpperCase(), {
+        fontSize: `${Math.round(h * 0.085)}px`,
+        color: "#cdd6f4",
+        fontStyle: "bold",
+        align: "center",
+        wordWrap: { width: w * 0.82 },
+        lineSpacing: Math.round(h * 0.01),
+      })
+      .setOrigin(0.5);
     c.add(name);
     if (def.oneTime) {
-      const warn = this.add.text(w / 2 - w * 0.16, -h / 2 + h * 0.12, "⚠", { fontSize: `${Math.round(h * 0.12)}px` }).setOrigin(0.5);
+      const warn = this.add.text(w / 2 - w * 0.15, -h / 2 + h * 0.17, "⚠", { fontSize: `${Math.round(h * 0.11)}px` }).setOrigin(0.5);
       c.add(warn);
     }
     return c;
