@@ -45,6 +45,8 @@ export class Game extends Scene {
   private fx!: Phaser.GameObjects.Container;
   private view: ClientGameState | null = null;
   private submitting = false;
+  /** True only between create() and shutdown/destroy; gates async EventBus callbacks. */
+  private alive = false;
 
   constructor() {
     super("Game");
@@ -57,11 +59,19 @@ export class Game extends Scene {
 
     EventBus.on(ClashEvent.View, this.onView, this);
     EventBus.on(ClashEvent.Reveal, this.onReveal, this);
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+    // Tear down on BOTH shutdown and destroy: `game.destroy()` (React unmount /
+    // StrictMode's dev double-mount) emits DESTROY, not SHUTDOWN, so listening
+    // only for SHUTDOWN would leak this scene's listeners and let a torn-down
+    // instance try to render onto a nulled board.
+    const cleanup = () => {
+      this.alive = false;
       EventBus.off(ClashEvent.View, this.onView, this);
       EventBus.off(ClashEvent.Reveal, this.onReveal, this);
-    });
+    };
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, cleanup);
+    this.events.once(Phaser.Scenes.Events.DESTROY, cleanup);
 
+    this.alive = true;
     // Ask React for the current authoritative view now that we can draw it.
     EventBus.emit(ClashEvent.Ready);
   }
@@ -69,12 +79,14 @@ export class Game extends Scene {
   // ---- event handlers -------------------------------------------------------
 
   private onView(view: ClientGameState) {
+    if (!this.alive) return;
     this.view = view;
     if (view.phase === "SELECTING" && !view.you.selected) this.submitting = false;
     this.renderView(view);
   }
 
   private onReveal({ state, result }: RevealPayload) {
+    if (!this.alive) return;
     this.view = state;
     this.renderReveal(state, result);
   }
