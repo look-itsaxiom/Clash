@@ -408,7 +408,9 @@ export class Game extends Scene {
       g.lineStyle(lw, COLOR_BORDER, 1);
       g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
       c.add(g);
-      const mark = this.add.text(0, 0, "⚔", { fontSize: `${Math.round(h * 0.3)}px`, color: "#3a4a82" }).setOrigin(0.5);
+      const mark = this.add
+        .text(0, 0, "⚔", { fontSize: `${Math.round(h * 0.3)}px`, color: "#3a4a82", padding: { y: Math.round(h * 0.1) } })
+        .setOrigin(0.5);
       c.add(mark);
       return c;
     }
@@ -424,7 +426,14 @@ export class Game extends Scene {
     g.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
     c.add(g);
 
-    const emoji = this.add.text(0, -h * 0.11, def.emoji, { fontSize: `${Math.round(h * 0.32)}px` }).setOrigin(0.5);
+    const emoji = this.add
+      .text(0, -h * 0.1, def.emoji, {
+        fontSize: `${Math.round(h * 0.32)}px`,
+        // Emoji glyphs render taller than the font ascent; pad so Phaser's text
+        // texture is tall enough and the top of the art isn't clipped.
+        padding: { y: Math.round(h * 0.12) },
+      })
+      .setOrigin(0.5);
     c.add(emoji);
     // Wrap on the card width so longer names ("Heavy Attack") never spill out.
     const name = this.add
@@ -439,7 +448,9 @@ export class Game extends Scene {
       .setOrigin(0.5);
     c.add(name);
     if (def.oneTime) {
-      const warn = this.add.text(w / 2 - w * 0.15, -h / 2 + h * 0.17, "⚠", { fontSize: `${Math.round(h * 0.11)}px` }).setOrigin(0.5);
+      const warn = this.add
+        .text(w / 2 - w * 0.15, -h / 2 + h * 0.17, "⚠", { fontSize: `${Math.round(h * 0.11)}px`, padding: { y: Math.round(h * 0.05) } })
+        .setOrigin(0.5);
       c.add(warn);
     }
     return c;
