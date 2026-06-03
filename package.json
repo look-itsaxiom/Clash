@@ -1,0 +1,35 @@
+{
+  "name": "clash",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build:shared": "npm --workspace @clash/shared run build",
+    "build:server": "npm --workspace @clash/server run build",
+    "build:client": "npm --workspace template-react-ts run build-nolog",
+    "build": "npm run build:shared && npm run build:server && npm run build:client",
+    "predev:server": "npm run build:shared",
+    "dev:server": "npm --workspace @clash/server run start:dev",
+    "predev:client": "npm run build:shared",
+    "dev:client": "npm --workspace template-react-ts run dev-nolog",
+    "test:shared": "npm --workspace @clash/shared run test",
+    "test:server": "npm --workspace @clash/server run test:e2e",
+    "test": "npm run build:shared && npm run test:shared && npm run test:server"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/look-itsaxiom/Clash.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/look-itsaxiom/Clash/issues"
+  },
+  "homepage": "https://github.com/look-itsaxiom/Clash#readme",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
