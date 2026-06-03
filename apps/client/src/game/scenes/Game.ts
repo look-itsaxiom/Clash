@@ -2,7 +2,7 @@ import { Scene } from "phaser";
 import { CARDS, MAX_HEARTS, type CardId, type ClientGameState, type Move, type TurnResult } from "@clash/shared";
 import { EventBus } from "../EventBus";
 import { ClashEvent, type RevealPayload } from "../events";
-import { BOARD_HEIGHT, BOARD_WIDTH } from "../main";
+import { BOARD_HEIGHT, BOARD_WIDTH } from "../constants";
 
 const CX = BOARD_WIDTH / 2;
 const CARD_W = 92;

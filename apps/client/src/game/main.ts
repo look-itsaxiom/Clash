@@ -1,8 +1,8 @@
 import { Game as MainGame } from "./scenes/Game";
 import { AUTO, Game, Scale, Types } from "phaser";
+import { BOARD_HEIGHT, BOARD_WIDTH } from "./constants";
 
-export const BOARD_WIDTH = 960;
-export const BOARD_HEIGHT = 640;
+export { BOARD_HEIGHT, BOARD_WIDTH } from "./constants";
 
 const config: Types.Core.GameConfig = {
     type: AUTO,
